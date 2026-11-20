@@ -10,7 +10,7 @@ const path = require('node:path');
 
 const ALL_LEAGUES = [
   { id: 'nba', label: 'NBA', short: 'NBA', path: 'basketball/nba', homeFirst: false },
-  { id: 'ncaab', label: "NCAAB Men's", short: 'NCAAB', path: 'basketball/mens-college-basketball', extraQuery: 'groups=50', homeFirst: false },
+  { id: 'ncaab', label: "NCAAB Men's", short: 'NCAAB', path: 'basketball/mens-college-basketball', homeFirst: false },
   { id: 'nhl', label: 'NHL', short: 'NHL', path: 'hockey/nhl', homeFirst: false },
   { id: 'nfl', label: 'NFL', short: 'NFL', path: 'football/nfl', homeFirst: false },
   { id: 'ncaaf', label: 'NCAAF', short: 'NCAAF', path: 'football/college-football', homeFirst: false },
@@ -19,6 +19,7 @@ const ALL_LEAGUES = [
 
 const DAY_MS = 86400000;
 
+/** ESPN's `dates` parameter takes calendar dates as YYYYMMDD (US Eastern). */
 function etDate(d) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' })
     .format(d)
@@ -37,7 +38,9 @@ const toScore = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
-function normalizeCompetition(ev, comp) {
+/** Turn one ESPN event into the compact shape the page uses. Returns null if it can't be read. */
+function normalizeEvent(ev) {
+  const comp = ev && ev.competitions && ev.competitions[0];
   if (!comp || !Array.isArray(comp.competitors) || comp.competitors.length < 2) return null;
 
   const home = comp.competitors.find((c) => c.homeAway === 'home') || comp.competitors[0];
@@ -71,6 +74,26 @@ function normalizeCompetition(ev, comp) {
     if (e.flag?.href) return String(e.flag.href);
     return '';
   };
+  const shows = s === 'live' || s === 'final';
+
+  return {
+    id: String(ev.id),
+    start: ev.date || comp.date || '',
+    s,
+    detail,
+    h: abbr(home),
+    a: abbr(away),
+    hn: full(home),
+    an: full(away),
+    hl: logo(home),
+    al: logo(away),
+    hw: Boolean(home.winner),
+    aw: Boolean(away.winner),
+    hs: shows ? toScore(home.score) : null,
+    as: shows ? toScore(away.score) : null
+  };
+}
+
   const shows = s === 'live' || s === 'final';
 
   return {
