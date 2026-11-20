@@ -1,0 +1,14 @@
+{
+  "name": "score-ticker",
+  "version": "1.0.0",
+  "description": "A live sports score ticker that polls ESPN's public scoreboard feed.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
