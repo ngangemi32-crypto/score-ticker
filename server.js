@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Score Ticker server.
- * Polls ESPN's public scoreboard endpoints, normalizes the data with logos,
+ * Polls ESPN's public scoreboard endpoints, normalizes the data with team logos & UFC fights,
  * and streams it to browsers over Server-Sent Events. No dependencies; needs Node 18+.
  */
 const http = require('node:http');
@@ -19,7 +19,6 @@ const ALL_LEAGUES = [
 
 const DAY_MS = 86400000;
 
-/** ESPN's `dates` parameter takes calendar dates as YYYYMMDD (US Eastern). */
 function etDate(d) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' })
     .format(d)
@@ -38,9 +37,7 @@ const toScore = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
-/** Turn one ESPN event into the compact shape the page uses. Returns null if it can't be read. */
-function normalizeEvent(ev) {
-  const comp = ev && ev.competitions && ev.competitions[0];
+function normalizeCompetition(ev, comp) {
   if (!comp || !Array.isArray(comp.competitors) || comp.competitors.length < 2) return null;
 
   const home = comp.competitors.find((c) => c.homeAway === 'home') || comp.competitors[0];
@@ -70,30 +67,10 @@ function normalizeEvent(ev) {
   const logo = (c) => {
     const e = entity(c);
     if (e.logo) return String(e.logo);
-    if (Array.isArray(e.logos) && e.logos[0]?.href) return String(e.logos[0].href);
-    if (e.flag?.href) return String(e.flag.href);
+    if (Array.isArray(e.logos) && e.logos[0] && e.logos[0].href) return String(e.logos[0].href);
+    if (e.flag && e.flag.href) return String(e.flag.href);
     return '';
   };
-  const shows = s === 'live' || s === 'final';
-
-  return {
-    id: String(ev.id),
-    start: ev.date || comp.date || '',
-    s,
-    detail,
-    h: abbr(home),
-    a: abbr(away),
-    hn: full(home),
-    an: full(away),
-    hl: logo(home),
-    al: logo(away),
-    hw: Boolean(home.winner),
-    aw: Boolean(away.winner),
-    hs: shows ? toScore(home.score) : null,
-    as: shows ? toScore(away.score) : null
-  };
-}
-
   const shows = s === 'live' || s === 'final';
 
   return {
@@ -183,8 +160,7 @@ function createApp(options = {}) {
   }
 
   async function fetchGames(league) {
-    const extra = league.extraQuery ? `&${league.extraQuery}` : '';
-    const url = `${cfg.espnBase}/${league.path}/scoreboard?dates=${dateRange(cfg.daysBack, cfg.daysAhead)}&limit=300${extra}`;
+    const url = `${cfg.espnBase}/${league.path}/scoreboard?dates=${dateRange(cfg.daysBack, cfg.daysAhead)}&limit=300`;
     const res = await fetch(url, {
       headers: { accept: 'application/json', 'user-agent': 'score-ticker/1.0' },
       signal: AbortSignal.timeout(cfg.timeoutMs)
@@ -274,3 +250,10 @@ function createApp(options = {}) {
     }, 25000);
     server.listen(cfg.port, cfg.host, () => {
       console.log(`Score Ticker running on http://${cfg.host}:${cfg.port}`);
+    });
+    return server;
+  }
+
+  return { start };
+}
+
